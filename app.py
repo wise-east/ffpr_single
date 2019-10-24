@@ -1,11 +1,9 @@
 from transformers import OpenAIGPTLMHeadModel, OpenAIGPTTokenizer, GPT2LMHeadModel, GPT2Tokenizer
-from train import SPECIAL_TOKENS, build_input_from_segments, add_special_tokens_
-from interact import top_filtering, predict 
+from utils import add_special_tokens_, predict, MAX_LEN, predict_next
 from argparse import ArgumentParser
 import torch
 from pprint import pformat
 import random
-
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for 
 import os 
@@ -33,8 +31,6 @@ def api():
     return jsonify({'article': out_text})
   # Parse request args into feature array for prediction
 
-
-
 def get_model_and_tokenizer(): 
   global model 
   global tokenizer 
@@ -42,29 +38,19 @@ def get_model_and_tokenizer():
   logger = logging.getLogger(__file__)
   logger.info(pformat(args))
 
-  random.seed(args.seed)
-  torch.random.manual_seed(args.seed)
-  torch.cuda.manual_seed(args.seed)
-
   logger.info("Get pretrained model and tokenizer")
   tokenizer_class = GPT2Tokenizer if "gpt2" == args.model else OpenAIGPTTokenizer
   tokenizer = tokenizer_class.from_pretrained(args.model_checkpoint)
   model_class = GPT2LMHeadModel if "gpt2" == args.model else OpenAIGPTLMHeadModel
   model = model_class.from_pretrained(args.model_checkpoint)
   model.to(args.device)
+  model.eval()
   add_special_tokens_(model, tokenizer)
 
 
 def generate_article(model, tokenizer, source=None): 
 
   global args 
-  # while True:
-  if not source: 
-    source = input(">>> ")
-    while not source:
-        print('Prompt should not be empty!')
-        source = input(">>> ")
-
   src = tokenizer.encode(source)
   with torch.no_grad():
       out_ids = predict(model, tokenizer, src, args)
@@ -72,25 +58,11 @@ def generate_article(model, tokenizer, source=None):
 
   return out_text
 
-@app.route('/result', methods=['GET', 'POST'])
-def result(): 
-  return render_template('result.html', title=title, output=output)
-
 @app.route('/main', methods=['GET', 'POST'])
 def main(): 
   global title
   global output 
-
-  if request.method =='GET': 
-  	return render_template('index.html')
-  if request.method =='POST': 
-    print(request.form)
-    title = request.form.get('title', None)
-    if title:
-      output = generate_article(model, tokenizer, title)
-      return redirect(url_for('result'))
-
-if __name__ == '__main__':
+  global args
 
   parser = ArgumentParser()
   parser.add_argument("--model", type=str, default="gpt2", help="Model type (gpt or gpt2)")
@@ -107,5 +79,29 @@ if __name__ == '__main__':
   parser.add_argument("--no_repeat_length", type=int, default=5, help="Provide length from end of current output that should not be repeated for new token added to the current output")
 
   args = parser.parse_args()
-  get_model_and_tokenizer()
-  app.run(host='0.0.0.0', port=80, debug=True)
+
+  if not model: 
+    get_model_and_tokenizer()
+
+  if request.method =='GET': 
+  	return render_template('index.html')
+  if request.method =='POST': 
+    print(request.form)
+    title = request.form.get('title', None)
+    if title:
+      src = tokenizer.encode(title) 
+      current_output = [] 
+      with torch.no_grad():
+        while len(current_output) < MAX_LEN: 
+          next_token = predict_next(model, tokenizer, src, current_output, args)
+          if next_token:
+            current_output.append(next_token)
+            output = tokenizer.decode(current_output, skip_special_tokens=True)
+            render_template('index.html', title=title, output=output)
+          else: 
+            break
+
+      return render_template('index.html', title=title, output=output)
+
+if __name__ == '__main__':
+  app.run(host='0.0.0.0', port=403, debug=True)

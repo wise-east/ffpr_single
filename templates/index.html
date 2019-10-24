@@ -49,6 +49,32 @@
 		opacity: 1.0;
 	}
 
+	.article{
+		text-align: justify;
+	}
+
+	.hidden{
+		visibility: hidden;
+	}
+
+	.heading{
+		margin-top: 20px;
+		text-align: center
+	}
+
+	.title{
+		margin-top: 30px;
+	}
+
+	.date{
+		opacity: 0.5;
+	}
+
+	.paragraph{
+		margin-bottom: 15px;
+	}
+
+
 </style>
 
 </head>
@@ -60,13 +86,13 @@
 			<div class="col-12 text-center">
 
 				<h4 id="instruction"> AI Wanna Munch! </h4>
-				<h6 id="detail"> Just type in any title suitable for a fast food press release and AI will automatically generate the article for you! </h6>
+				<h6 id="detail"> Type in any title suitable for a fast food press release and artificial intelligence will automatically generate the article for you! </h6>
 			</div>
 
 			<div class="col-12 text-center">
-				<form method="post">
+				<form method="POST">
 					<input type="text" name="title" id="title-input" placeholder="Your title goes here...">
-					<input type="submit" value="Write my article for me!" class='submit-button btn btn-primary'>
+					<input type="submit" value="Munch away!" class='submit-button btn btn-primary'>
 				</form>
 			</div>
 
@@ -75,6 +101,21 @@
 		<div class="row justify-content-center">
 			<div id="loader"></div>
 		</div>
+
+
+
+			
+			<div class="row justify-content-center">
+
+				<div class="col-12 title">
+					<h3> {{title}}</h3>
+				</div>
+
+				<div class="col-12 article hidden">
+					{{output}}
+				</div>
+
+			</div>
 	</div>
 </body>
 
@@ -83,6 +124,35 @@
 	$(".submit-button").click(function(){
 		$(".content").addClass("opaque")
 		$("#loader").addClass("loader")
+	});
+
+	$(document).ready(function(){
+		article = $(".article").html()
+		$(".article").html("")
+
+		console.log(article)
+		// add date to the article 
+		if (article.trim() != ""){
+			let today = new Date()
+			var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+			console.log(date)
+			date_div = $("<div class='date'>").html(date)
+			$(".article").append(date_div)
+		}
+
+		// divide article into paragraphs
+		console.log(article)
+		paragraphs = article.split("\n")
+		console.log(paragraphs.length)
+		console.log(paragraphs[1])
+		for (let i =0; i < paragraphs.length; i++){
+			if (paragraphs[i].trim() != ""){
+				div = $("<div class='paragraph'>").html(paragraphs[i].trim())
+				$(".article").append(div)
+			}
+		}
+
+		$(".article").removeClass("hidden")
 	});
 
 </script>

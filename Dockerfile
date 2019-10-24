@@ -1,6 +1,14 @@
 FROM python:3.6-slim
-COPY . /deploy/
 WORKDIR /deploy/ 
-RUN pip install -r requirements.txt
-EXPOSE 80
+
+COPY requirements.txt . 
+
+RUN apk add --no-cache --virtual .build-deps \
+    build-base openssl-dev pkgconfig libffi-dev \
+    cups-dev jpeg-dev && \
+    pip install --no-cache-dir -r requirements.txt && \
+    apk del .build-deps
+
+COPY . . 
+EXPOSE 403
 ENTRYPOINT ["python", "app.py"]
