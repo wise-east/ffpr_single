@@ -113,10 +113,17 @@ def main():
           if next_token:
             current_output.append(next_token)
             output = tokenizer.decode(current_output, skip_special_tokens=True)
-            render_template('index.html', title=title, output=output)
+            # doesn't do anything 
+            # render_template('index.html', title=title, output=output)
           else: 
             break
 
+      cursor = db.cursor() 
+      sql = "INSERT INTO main (title, article) VALUES (%s, %s)"
+      val = (title, output)
+      cursor.execute(sql, val)
+      db.commit()
+      cursor.close()
       return render_template('index.html', title=title, output=output)
 
 if __name__ == '__main__':
