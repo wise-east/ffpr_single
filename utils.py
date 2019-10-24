@@ -100,21 +100,21 @@ def predict_next(model, tokenizer, src, current_output, args):
     special_tokens_ids = tokenizer.convert_tokens_to_ids(list(SPECIAL_TOKENS))
     instance = build_input_from_segments(src, current_output, tokenizer, with_eos = False)
 
-    input_ids = torch.tensor(instance["input_ids"], device=args.device).unsqueeze(0)
+    input_ids = torch.tensor(instance["input_ids"], device=args['device']).unsqueeze(0)
 
-    token_type_ids = torch.tensor(instance["token_type_ids"], device=args.device).unsqueeze(0)
+    token_type_ids = torch.tensor(instance["token_type_ids"], device=args['device']).unsqueeze(0)
 
     logits = model(input_ids, token_type_ids=token_type_ids)
 
     if isinstance(logits, tuple):  # for gpt2 and maybe others
         logits = logits[0]
-    logits = logits[0, -1, :] / args.temperature
-    logits = top_filtering(logits, top_k=args.top_k, top_p=args.top_p)
+    logits = logits[0, -1, :] / args['temperature']
+    logits = top_filtering(logits, top_k=args['top_k'], top_p=args['top_p'])
     probs = F.softmax(logits, dim=-1)
 
-    prev = torch.topk(probs, 1)[1] if args.no_sample else torch.multinomial(probs, 1)
-    if prev in current_output[-args.no_repeat_length:] or (len(current_output) < args.min_length and prev.item() in special_tokens_ids):
-        while prev in current_output[-args.no_repeat_length:] or prev.item() in special_tokens_ids:
+    prev = torch.topk(probs, 1)[1] if args['no_sample'] else torch.multinomial(probs, 1)
+    if prev in current_output[-args['no_repeat_length']:] or (len(current_output) < args['min_length'] and prev.item() in special_tokens_ids):
+        while prev in current_output[-args['no_repeat_length']:] or prev.item() in special_tokens_ids:
             if probs.max().item() == 1:
                 warnings.warn("Warning: model generating repeated token or special token with probability 1.")
                 w_message = f"Current output: {tokenizer.decode(current_output)}, output to be added: {tokenizer.decode([prev.item()])}"
