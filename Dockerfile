@@ -3,12 +3,8 @@ WORKDIR /deploy/
 
 COPY requirements.txt . 
 
-RUN apk add --no-cache --virtual .build-deps \
-    build-base openssl-dev pkgconfig libffi-dev \
-    cups-dev jpeg-dev && \
-    pip install --no-cache-dir -r requirements.txt && \
-    apk del .build-deps
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . . 
 EXPOSE 403
-ENTRYPOINT ["python", "app.py"]
+ENTRYPOINT ["gunicorn", "app:app", "--bind", "0.0.0.0:403", "-t", "1000", "-w", "4"]
