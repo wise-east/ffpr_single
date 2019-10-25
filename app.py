@@ -105,24 +105,39 @@ def main():
     print(request.form)
     title = request.form.get('title', None)
     if title:
-      src = tokenizer.encode(title) 
-      current_output = [] 
-      with torch.no_grad():
-        while len(current_output) < MAX_LEN: 
-          next_token = predict_next(model, tokenizer, src, current_output, args)
-          if next_token:
-            current_output.append(next_token)
-            output = tokenizer.decode(current_output, skip_special_tokens=True)
-            # doesn't do anything 
-            # render_template('index.html', title=title, output=output)
-          else: 
-            break
 
+      # search if same query exists in the database 
       cursor = db.cursor() 
-      sql = "INSERT INTO main (title, article) VALUES (%s, %s)"
-      val = (title, output)
-      cursor.execute(sql, val)
-      db.commit()
+      sql=f"SELECT * FROM main WHERE title='{title}'"
+      # print(sql)
+      cursor.execute(sql)
+      result = cursor.fetchone()
+      if result: 
+        # last column is the article 
+        output = result[-1]
+
+      # if it doesn't exist, run new prediction and store in database
+      else: 
+        src = tokenizer.encode(title) 
+        current_output = [] 
+        with torch.no_grad():
+          while len(current_output) < MAX_LEN: 
+            next_token = predict_next(model, tokenizer, src, current_output, args)
+            if next_token:
+              current_output.append(next_token)
+              output = tokenizer.decode(current_output, skip_special_tokens=True)
+              # doesn't do anything 
+              # render_template('index.html', title=title, output=output)
+            else: 
+              break
+
+        # insert result to the database 
+        sql = "INSERT INTO main (title, article) VALUES (%s, %s)"
+        val = (title, output)
+        cursor.execute(sql, val)
+        db.commit()
+
+
       cursor.close()
       return render_template('index.html', title=title, output=output)
 
