@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 
 
-MAX_LEN = 512
+MAX_LEN = 128
 SPECIAL_TOKENS = ["<bos>", "<eos>", "<src>", "<target>", "<pad>"]
 ATTR_TO_SPECIAL_TOKEN = {'bos_token': '<bos>', 'eos_token': '<eos>', 'pad_token': '<pad>',
                          'additional_special_tokens': ('<src>', '<target>')}
@@ -99,6 +99,8 @@ def predict_next(model, tokenizer, src, current_output, args):
 
     special_tokens_ids = tokenizer.convert_tokens_to_ids(list(SPECIAL_TOKENS))
     instance = build_input_from_segments(src, current_output, tokenizer, with_eos = False)
+    if instance is None: 
+        return None 
 
     input_ids = torch.tensor(instance["input_ids"], device=args['device']).unsqueeze(0)
 
@@ -134,7 +136,7 @@ def predict(model, tokenizer, src, args):
     model.eval()
     current_output = [] 
 
-    for i in range(MAX_LEN):
+    for i in range(MAX_LEN-len(src)):
 
         next_token = predict_next(model, tokenizer, src, current_output, args)
         if next_token: 
