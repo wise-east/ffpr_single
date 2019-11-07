@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 
 
-MAX_LEN = 128
+MAX_LEN = 1024
 SPECIAL_TOKENS = ["<bos>", "<eos>", "<src>", "<target>", "<pad>"]
 ATTR_TO_SPECIAL_TOKEN = {'bos_token': '<bos>', 'eos_token': '<eos>', 'pad_token': '<pad>',
                          'additional_special_tokens': ('<src>', '<target>')}
@@ -29,18 +29,8 @@ def build_input_from_segments(src, target, tokenizer, lm_labels=False, with_eos=
     instance["sequence"] = sequence 
     instance["input_ids"] = list(chain(*sequence))
 
-    if len(instance["input_ids"]) > MAX_LEN: 
-        return None 
-
     instance["token_type_ids"] = [src_token]*len(sequence[0]) + [target_token]*len(sequence[1])
 
-    # only calculate loss for the target sequence. 
-    if lm_labels:
-        instance["lm_labels"] = [-1] * len(sequence[0]) + [-1] + sequence[-1][1:]
-    else: 
-        instance["lm_labels"] = [-1] * len(instance["input_ids"])
-
-    assert len(instance["lm_labels"]) == len(instance["input_ids"]) == len(instance["token_type_ids"])
     return instance
 
 
@@ -95,12 +85,21 @@ def top_filtering(logits, top_k=0, top_p=0.0, threshold=-float('Inf'), filter_va
 
     return logits
 
-def predict_next(model, tokenizer, src, current_output, args): 
+def predict_next(model, tokenizer, src, current_output, args, prevent_token = None) -> int: 
 
     special_tokens_ids = tokenizer.convert_tokens_to_ids(list(SPECIAL_TOKENS))
     instance = build_input_from_segments(src, current_output, tokenizer, with_eos = False)
     if instance is None: 
+        warnings.warn("Returned input instance is 'None'.")
         return None 
+
+    # The maximum length input for GPT2 model is 1024. 
+    assert args["max_length"] <= 1024 
+
+    # If the input_ids exceed the max length in configuration, truncate it.
+    if len(instance["input_ids"]) > args["max_length"]: 
+        instance["input_ids"] = instance["input_ids"][-args["max_length"]:]
+        instance["token_type_ids"] = instance["token_type_ids"][-args["max_length"]:]
 
     input_ids = torch.tensor(instance["input_ids"], device=args['device']).unsqueeze(0)
 
@@ -115,33 +114,21 @@ def predict_next(model, tokenizer, src, current_output, args):
     probs = F.softmax(logits, dim=-1)
 
     prev = torch.topk(probs, 1)[1] if args['no_sample'] else torch.multinomial(probs, 1)
-    if prev in current_output[-args['no_repeat_length']:] or (len(current_output) < args['min_length'] and prev.item() in special_tokens_ids):
-        while prev in current_output[-args['no_repeat_length']:] or prev.item() in special_tokens_ids:
-            if probs.max().item() == 1:
-                warnings.warn("Warning: model generating repeated token or special token with probability 1.")
-                w_message = f"Current output: {tokenizer.decode(current_output)}, output to be added: {tokenizer.decode([prev.item()])}"
-                warnings.warn(w_message)
-                break  # avoid infinitely looping over repeated or special token
-            prev = torch.multinomial(probs, num_samples=1)
+
+    # 1. check if the output is not as long as the desired minimum output length
+    while prev.item() in special_tokens_ids or prev.item() == prevent_token: 
+        if probs.max().item() == 1: 
+            warnings.warn("Warning: model generating special token with probability 1.")
+            break
+        prev = torch.multinomial(probs, num_samples=1)
 
     if prev.item() in special_tokens_ids:
-        return None 
+        warnings.warn("Returning 'None' as token produced is a special token: " + tokenizer.decode(prev.item()))
+        return None  
+
+    if prev.item() == prevent_token: 
+        warnings.warn("Returning 'None' as token produced is a token that leads to repetition: " + tokenizer.decode(prev.item()))
+        return None  
 
     return prev.item()
 
-
-# generate prediction 
-def predict(model, tokenizer, src, args): 
-
-    model.eval()
-    current_output = [] 
-
-    for i in range(MAX_LEN-len(src)):
-
-        next_token = predict_next(model, tokenizer, src, current_output, args)
-        if next_token: 
-            current_output.append(next_token)
-        else: 
-            break 
-
-    return current_output

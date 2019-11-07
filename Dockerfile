@@ -13,6 +13,7 @@ COPY . /app
 
 WORKDIR /app
 
-EXPOSE 443
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:443", "-t", "1000", "-w", "1"]
+EXPOSE 3000 
+CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--worker-class", "eventlet", "-t", "1000", "-w", "1", "wsgi"]
 #gunicorn app:app --bind 0.0.0.0:5000 -t 1000 
+#gunicorn --bind 0.0.0.0:3000 --worker-class eventlet -t 1000 -w 1 wsgi
