@@ -6,7 +6,7 @@ chardet==3.0.4
 Click==7.0
 dnspython==1.16.0
 docutils==0.15.2
-eventlet==0.25.1
+eventlet==0.31.0
 Flask==1.1.1
 Flask-SocketIO==4.2.1
 greenlet==0.4.15
