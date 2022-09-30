@@ -15,7 +15,7 @@ idna==2.8
 itsdangerous==1.1.0
 Jinja2==2.10.3
 jmespath==0.9.4
-joblib==0.14.0
+joblib==1.2.0
 MarkupSafe==1.1.1
 monotonic==1.5
 mysql-connector==2.2.9
